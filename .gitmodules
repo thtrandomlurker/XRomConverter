@@ -1,0 +1,6 @@
+[submodule "Dependencies/MikuMikuLibrary"]
+	path = Dependencies/MikuMikuLibrary
+	url = https://github.com/blueskythlikesclouds/MikuMikuLibrary
+[submodule "Dependencies/FirstWrite"]
+	path = Dependencies/FirstWrite
+	url = https://github.com/thtrandomlurker/FirstWrite

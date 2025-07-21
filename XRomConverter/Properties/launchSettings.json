@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "MFMKBuilder": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\EMU\\Vita3K\\Storage\\ux0\\app\\PCSG00683\\rom\r\n\"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Hatsune Miku Project DIVA Mega Mix Plus\"\r\nOutput"
+    }
+  }
+}

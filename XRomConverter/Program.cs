@@ -29,6 +29,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Reflection.PortableExecutable;
 using MikuMikuLibrary.Cryptography;
+using System.Runtime.InteropServices;
 
 namespace XRomConverter;
 
@@ -91,11 +92,18 @@ internal class Program
 {
     static void Main(string[] args)
     {
-
         if (args.Length < 3)
         {
             Console.WriteLine("Usage: XRomConverter.exe \"X Rom Path\" \"MegaMix+ Path\" \"Output Path\" [OPTIONS]");
             return;
+        }
+
+        PSARC? arc = null;
+
+        if (Path.Exists(Path.Combine(args[0], "data.psarc")))
+        {
+            arc = new PSARC();
+            arc.Load(Path.Combine(args[0], "data.psarc"));
         }
 
         // tree setup
@@ -243,7 +251,16 @@ internal class Program
             FarcArchive objFarc = null;
             ACCTPath objPathEntry = firstRead.AddonContentContainers[0].Paths.First(x => x.FileName == objfile);
             if (objPathEntry.Flags == ACCTPathMode.Packed)
-                objFarc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], "data", objfile));
+            {
+                if (arc != null)
+                {
+                    objFarc = BinaryFile.Load<FarcArchive>(arc.Open(objfile));
+                }
+                else
+                {
+                    objFarc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], "data", objfile));
+                }
+            }
             else
             {
                 objFarc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], objPathEntry.FilePath, objPathEntry.FileName));
@@ -284,7 +301,16 @@ internal class Program
 
         ACCTPath bonePathentry = firstRead.AddonContentContainers[0].Paths.First(x => x.FileName == "bone_data.bon");
         if (bonePathentry.Flags == ACCTPathMode.Packed)
-            xBoneData = BinaryFile.Load<BoneData>(Path.Combine(args[0], "data", "bone_data.bon"));
+        {
+            if (arc != null)
+            {
+                xBoneData = BinaryFile.Load<BoneData>(arc.Open("bone_data.bon"));
+            }
+            else
+            {
+                xBoneData = BinaryFile.Load<BoneData>(Path.Combine(args[0], "data", "bone_data.bon"));
+            }
+        }
         else
         {
             xBoneData = BinaryFile.Load<BoneData>(Path.Combine(args[0], bonePathentry.FilePath, bonePathentry.FileName));
@@ -1230,66 +1256,74 @@ internal class Program
                     ACCTPath sprPathEntry = firstRead.AddonContentContainers[0].Paths.First(x => x.FileName == $"spr_mdl_thmb{module.ModuleID:D3}l.farc");
                     string sprPath = null;
                     if (sprPathEntry.Flags == ACCTPathMode.Packed)
+                    {
                         sprPath = Path.Combine(args[0], "data", $"spr_mdl_thmb{module.ModuleID:D3}l.farc");
+                    }
                     else
                     {
                         sprPath = Path.Combine(args[0], sprPathEntry.FilePath, sprPathEntry.FileName);
                     }
-                    using (FarcArchive xSprFarc = BinaryFile.Load<FarcArchive>(sprPath))
+                    FarcArchive xSprFarc;
+                    if (arc != null)
                     {
-                        SpriteDatabase spi = xSprFarc.Open<SpriteDatabase>($"spr_mdl_thmb{module.ModuleID:D3}l.spi");
-                        SpriteSet spr = xSprFarc.Open<SpriteSet>($"spr_mdl_thmb{module.ModuleID:D3}l.spr");
+                        xSprFarc = BinaryFile.Load<FarcArchive>(arc.Open(sprPathEntry.FileName));
+                    }
+                    else
+                    {
+                        xSprFarc = BinaryFile.Load<FarcArchive>(sprPath);
+                    }
+                    SpriteDatabase spi = xSprFarc.Open<SpriteDatabase>($"spr_mdl_thmb{module.ModuleID:D3}l.spi");
+                    SpriteSet spr = xSprFarc.Open<SpriteSet>($"spr_mdl_thmb{module.ModuleID:D3}l.spr");
 
-                        if (mmSpriteData.SpriteSets.FirstOrDefault(x => x.Name == $"SPR_SEL_MD{module.ModuleID:D3}CMN") == null)
+                    if (mmSpriteData.SpriteSets.FirstOrDefault(x => x.Name == $"SPR_SEL_MD{module.ModuleID:D3}CMN") == null)
+                    {
+                        SpriteSetInfo modSprSetInfo = new SpriteSetInfo()
                         {
-                            SpriteSetInfo modSprSetInfo = new SpriteSetInfo()
-                            {
-                                Id = spriteSetIdBase,
-                                Name = $"SPR_SEL_MD{module.ModuleID:D3}CMN",
-                                FileName = $"spr_sel_md{module.ModuleID:D3}cmn.bin",
-                                Sprites = { new SpriteInfo() { Name = $"SPR_SEL_MD{module.ModuleID:D3}CMN_MD_IMG", Id = spriteIdBase, Index = 0 } },
-                                Textures = { new SpriteTextureInfo() { Name = $"SPR_SEL_MD{module.ModuleID:D3}CMN_MERGE_BC5COMP", Id = spriteTexIdBase, Index = 0 } }
-                            };
-                            spriteSetIdBase += 1;
-                            spriteIdBase += 1;
-                            spriteTexIdBase += 1;
-                            modSprDb.SpriteSets.Add(modSprSetInfo);
-                        }
+                            Id = spriteSetIdBase,
+                            Name = $"SPR_SEL_MD{module.ModuleID:D3}CMN",
+                            FileName = $"spr_sel_md{module.ModuleID:D3}cmn.bin",
+                            Sprites = { new SpriteInfo() { Name = $"SPR_SEL_MD{module.ModuleID:D3}CMN_MD_IMG", Id = spriteIdBase, Index = 0 } },
+                            Textures = { new SpriteTextureInfo() { Name = $"SPR_SEL_MD{module.ModuleID:D3}CMN_MERGE_BC5COMP", Id = spriteTexIdBase, Index = 0 } }
+                        };
+                        spriteSetIdBase += 1;
+                        spriteIdBase += 1;
+                        spriteTexIdBase += 1;
+                        modSprDb.SpriteSets.Add(modSprSetInfo);
+                    }
 
-                        using (Bitmap cropped = SpriteCropper.Crop(spr.Sprites[0], spr))
+                    using (Bitmap cropped = SpriteCropper.Crop(spr.Sprites[0], spr))
+                    {
+                        using (Bitmap scaled = new Bitmap(512, 512))
                         {
-                            using (Bitmap scaled = new Bitmap(512, 512))
+                            using (Graphics gfx = Graphics.FromImage(scaled))
                             {
-                                using (Graphics gfx = Graphics.FromImage(scaled))
-                                {
-                                    gfx.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                                    gfx.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-                                    gfx.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                                gfx.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                                gfx.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                                gfx.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
 
-                                    gfx.DrawImage(cropped, 2, 2, 408, 408);
-                                }
+                                gfx.DrawImage(cropped, 2, 2, 408, 408);
+                            }
 
-                                scaled.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                            scaled.RotateFlip(RotateFlipType.RotateNoneFlipY);
 
-                                spr.TextureSet.Textures[0] = TextureEncoder.EncodeYCbCrFromBitmap(scaled);
-                                spr.Sprites[0].Name = "MD_IMG";
-                                spr.Sprites[0].ResolutionMode = ResolutionMode.HDTV1080;
-                                spr.Sprites[0].X = 2;
-                                spr.Sprites[0].Y = 2;
-                                spr.Sprites[0].Width = 408;
-                                spr.Sprites[0].Height = 494;
-                                spr.Sprites[0].RectangleBegin = new Vector2(spr.Sprites[0].X / 512, spr.Sprites[0].Y / 512);
-                                spr.Sprites[0].RectangleEnd = new Vector2(spr.Sprites[0].X / 512 + spr.Sprites[0].Width / 512, spr.Sprites[0].Y / 512 + spr.Sprites[0].Height / 512);
+                            spr.TextureSet.Textures[0] = TextureEncoder.EncodeYCbCrFromBitmap(scaled);
+                            spr.Sprites[0].Name = "MD_IMG";
+                            spr.Sprites[0].ResolutionMode = ResolutionMode.HDTV1080;
+                            spr.Sprites[0].X = 2;
+                            spr.Sprites[0].Y = 2;
+                            spr.Sprites[0].Width = 408;
+                            spr.Sprites[0].Height = 494;
+                            spr.Sprites[0].RectangleBegin = new Vector2(spr.Sprites[0].X / 512, spr.Sprites[0].Y / 512);
+                            spr.Sprites[0].RectangleEnd = new Vector2(spr.Sprites[0].X / 512 + spr.Sprites[0].Width / 512, spr.Sprites[0].Y / 512 + spr.Sprites[0].Height / 512);
 
-                                using (FarcArchive modSprFarc = new FarcArchive())
-                                {
-                                    MemoryStream sprStream = new MemoryStream();
-                                    spr.Format = BinaryFormat.DT;
-                                    spr.Save(sprStream, true);
+                            using (FarcArchive modSprFarc = new FarcArchive())
+                            {
+                                MemoryStream sprStream = new MemoryStream();
+                                spr.Format = BinaryFormat.DT;
+                                spr.Save(sprStream, true);
 
-                                    modSprFarc.Add($"spr_sel_md{module.ModuleID:D3}cmn.bin", sprStream, false);
-                                    modSprFarc.Save(Path.Combine(args[2], "rom", "2d", $"spr_sel_md{module.ModuleID:D3}cmn.farc"));
-                                }
+                                modSprFarc.Add($"spr_sel_md{module.ModuleID:D3}cmn.bin", sprStream, false);
+                                modSprFarc.Save(Path.Combine(args[2], "rom", "2d", $"spr_sel_md{module.ModuleID:D3}cmn.farc"));
                             }
                         }
                     }
@@ -1750,7 +1784,16 @@ internal class Program
                 FarcArchive conversionFarc = null;
                 ACCTPath convPathEntry = firstRead.AddonContentContainers[0].Paths.FirstOrDefault(x => x.FileName == $"{objsetName.ToLower()}.farc");
                 if (convPathEntry.Flags == ACCTPathMode.Packed)
-                    conversionFarc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], "data", $"{objsetName.ToLower()}.farc"));
+                {
+                    if (arc != null)
+                    {
+                        conversionFarc = BinaryFile.Load<FarcArchive>(arc.Open($"{objsetName.ToLower()}.farc"));
+                    }
+                    else
+                    {
+                        conversionFarc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], "data", $"{objsetName.ToLower()}.farc"));
+                    }
+                }
                 else
                 {
                     conversionFarc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], convPathEntry.FilePath, convPathEntry.FileName));
@@ -1850,7 +1893,14 @@ internal class Program
                     }
                     if (skpPath != null)
                     {
-                        osp.Load(skpPath);
+                        if (arc != null)
+                        {
+                            osp.Load(arc.Open(skpPathEntry.FileName));
+                        }
+                        else
+                        {
+                            osp.Load(skpPath);
+                        }
                         osp.Format = BinaryFormat.DT;
                     }
 
@@ -2174,7 +2224,14 @@ internal class Program
 
                 if (motPathEntry.Flags == ACCTPathMode.Packed)
                 {
-                    xFaceMotArc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], "data", $"mot_{charName.ToLower()}.farc"));
+                    if (arc != null)
+                    {
+                        xFaceMotArc = BinaryFile.Load<FarcArchive>(arc.Open($"mot_{charName.ToLower()}.farc"));
+                    }
+                    else
+                    {
+                        xFaceMotArc = BinaryFile.Load<FarcArchive>(Path.Combine(args[0], "data", $"mot_{charName.ToLower()}.farc"));
+                    }
                 }
                 else
                 {
@@ -2231,8 +2288,6 @@ internal class Program
 
             osageSettingWriter.Save(Path.Combine(args[2], "rom", "skin_param", "mod_osage_setting.txt"));
         }
-
-
 
         langToml.Close();
     }

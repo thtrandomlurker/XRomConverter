@@ -203,10 +203,10 @@ internal class Program
         XReader reader = new XReader(File.Open(Path.Combine(romPath, "firstread.bin"), FileMode.Open));
         // check magic
         string magic = reader.ReadString(FirstLib.IO.StringFormat.FixedLength, 4);
+        reader.Seek(0, XSeekOrigin.Begin);
 
         if (magic == "DIVA")
         {
-            reader.Seek(0, XSeekOrigin.Begin);
             MemoryStream dec = DivafileDecryptor.DecryptToMemoryStream(reader.BaseStream);
 
             reader.Close();
